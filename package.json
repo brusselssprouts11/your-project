@@ -1,0 +1,11 @@
+{
+  "name": "arduino-firebase-api",
+  "version": "1.0.0",
+  "description": "API for Arduino to Firebase",
+  "scripts": {
+    "dev": "node api/receive_data.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
