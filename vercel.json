@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/receive_data.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/receive_data",
+      "dest": "/api/receive_data.js",
+      "methods": ["POST", "GET"]
+    }
+  ]
+}
