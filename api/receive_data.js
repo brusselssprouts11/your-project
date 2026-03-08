@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
+
 module.exports = async (req, res) => {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -9,7 +9,7 @@ module.exports = async (req, res) => {
 
   try {
     const rawData = req.body;
-    const timestamp = new Date().toLocaleString('en-US', { 
+    const timestamp = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Manila',
       year: 'numeric',
       month: '2-digit',
@@ -23,11 +23,27 @@ module.exports = async (req, res) => {
     console.log('Received data:', rawData);
     console.log('Server timestamp:', timestamp);
 
-    // ✅ FIX 1: Added deviceId to extraction
     const { temperature, humidity, soilMoisture, pH, light, deviceId, timestamp: arduinoTimestamp } = rawData;
 
     const FIREBASE_URL = 'https://agriknows-data-default-rtdb.asia-southeast1.firebasedatabase.app';
     const FIREBASE_SECRET = 'dfMAPU9mohsRupxSlRz6v77a1Ou9sJST3BodYO79';
+
+    // ── DEVICE LOOKUP: get user_id from deviceId ──
+    let user_id = 'unassigned';
+
+    if (deviceId) {
+      const deviceResponse = await fetch(
+        `${FIREBASE_URL}/devices/${deviceId}.json?auth=${FIREBASE_SECRET}`
+      );
+      const deviceData = await deviceResponse.json();
+
+      if (deviceData && deviceData.assignedTo) {
+        user_id = deviceData.assignedTo;
+        console.log(`Device ${deviceId} → user_id: ${user_id}`);
+      } else {
+        console.log(`Device ${deviceId} not assigned to any user`);
+      }
+    }
 
     const firebasePayload = {
       temperature: temperature || 0,
@@ -35,8 +51,9 @@ module.exports = async (req, res) => {
       soilMoisture: soilMoisture || 0,
       pH: pH || 0,
       light: light || 'DARK',
-      timestamp: timestamp,             
-      deviceId: deviceId || 'unknown'   
+      timestamp: timestamp,
+      deviceId: deviceId || 'unknown',
+      user_id: user_id  // ← now correctly set from device lookup
     };
 
     const firebaseResponse = await fetch(
@@ -55,6 +72,7 @@ module.exports = async (req, res) => {
         status: 'success',
         message: 'Data received and sent to Firebase',
         server_time: timestamp,
+        user_id: user_id,
         firebase_result: firebaseResult
       });
     } else {
@@ -64,6 +82,7 @@ module.exports = async (req, res) => {
         firebase_error: firebaseResult
       });
     }
+
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({
