@@ -6,19 +6,16 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle OPTIONS request for CORS
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const rawData = req.body;
-    const timestamp = new Date().toLocaleString('en-US', { 
+
+    const FIREBASE_URL = 'https://agriknows-data-default-rtdb.asia-southeast1.firebasedatabase.app';
+    const FIREBASE_SECRET = 'dfMAPU9mohsRupxSlRz6v77a1Ou9sJST3BodYO79';
+
+    const timestamp = new Date().toLocaleString('en-US', {
       timeZone: 'Asia/Manila',
       year: 'numeric',
       month: '2-digit',
@@ -30,33 +27,48 @@ module.exports = async (req, res) => {
     }).replace(/(\d+)\/(\d+)\/(\d+),?/, '$3-$1-$2');
 
     console.log('Received data:', rawData);
-    console.log('Server timestamp:', timestamp);
 
-    // Extract values from Arduino
-    const { temperature, humidity, soilMoisture, pH, light, timestamp: arduinoTimestamp } = rawData;
+    const { temperature, humidity, soilMoisture, pH, light, deviceId } = rawData;
 
-    // --- Firebase Configuration ---
-    const FIREBASE_URL = 'https://agriknows-data-default-rtdb.asia-southeast1.firebasedatabase.app';
-    const FIREBASE_SECRET = 'dfMAPU9mohsRupxSlRz6v77a1Ou9sJST3BodYO79';
+    // ── STEP 1: Lookup deviceId in Firebase to get user_id ──
+    let user_id = null;
 
-    // Data to send to Firebase
+    if (deviceId) {
+      const deviceResponse = await fetch(
+        `${FIREBASE_URL}/devices/${deviceId}.json?auth=${FIREBASE_SECRET}`
+      );
+      const deviceData = await deviceResponse.json();
+
+      if (deviceData && deviceData.assignedTo) {
+        user_id = deviceData.assignedTo;
+        console.log(`Device ${deviceId} assigned to user: ${user_id}`);
+      } else {
+        console.log(`Device ${deviceId} not found or not assigned to any user`);
+      }
+    } else {
+      console.log('No deviceId provided in payload');
+    }
+
+    // ── STEP 2: Build Firebase payload ──
     const firebasePayload = {
       temperature: temperature || 0,
       humidity: humidity || 0,
       soilMoisture: soilMoisture || 0,
       pH: pH || 0,
       light: light || 'DARK',
-      timestamp: timestamp
+      timestamp: timestamp,
+      deviceId: deviceId || 'unknown',
+      user_id: user_id || 'unassigned'
     };
 
-    // Send to Firebase
+    console.log('Saving to Firebase:', firebasePayload);
+
+    // ── STEP 3: Save to Firebase sensorData ──
     const firebaseResponse = await fetch(
       `${FIREBASE_URL}/sensorData.json?auth=${FIREBASE_SECRET}`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(firebasePayload),
       }
     );
@@ -64,15 +76,14 @@ module.exports = async (req, res) => {
     const firebaseResult = await firebaseResponse.json();
 
     if (firebaseResponse.ok) {
-      // Success response
       res.status(200).json({
         status: 'success',
         message: 'Data received and sent to Firebase',
         server_time: timestamp,
+        user_id: user_id || 'unassigned',
         firebase_result: firebaseResult
       });
     } else {
-      // Firebase error
       res.status(500).json({
         status: 'error',
         message: 'Failed to send to Firebase',
