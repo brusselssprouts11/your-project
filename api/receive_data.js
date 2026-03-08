@@ -39,6 +39,7 @@ module.exports = async (req, res) => {
       pH: pH || 0,
       light: light || 'DARK',
       timestamp: timestamp
+      deviceId: deviceId || 'unknown'
     };
     // Send to Firebase
     const firebaseResponse = await fetch(
