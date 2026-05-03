@@ -1,11 +1,12 @@
 {
-  "name": "arduino-firebase-api",
+  "name": "agriknows-server",
   "version": "1.0.0",
-  "description": "API for Arduino to Firebase",
+  "main": "index.js",
   "scripts": {
-    "dev": "node api/receive_data.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "node-fetch": "^2.6.7"
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.9"
   }
 }
